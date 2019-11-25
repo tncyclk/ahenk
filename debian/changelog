@@ -1,0 +1,67 @@
+ahenk (1.1.10) unstable; urgency=medium
+
+  * updated receiverresource in ahenk.conf
+
+ -- Tuncay ÇOLAK <tuncay.colak@tubitak.gov.tr>  Tue, 15 Jan 2019 14:25:53 +0300
+
+ahenk (1.1.9) unstable; urgency=medium
+
+  * registration counter added and stop ahenk service after this counter
+
+ -- Tuncay ÇOLAK <tuncay.colak@tubitak.gov.tr>  Thu, 10 Jan 2019 14:07:27 +0300
+
+ahenk (1.1.8) unstable; urgency=medium
+
+  * Move service unit file into debian
+
+ -- Yunusemre Şentürk <yunusemre.senturk@pardus.org.tr>  Fri, 23 Nov 2018 10:49:26 +0300
+
+ahenk (1.1.7) unstable; urgency=medium
+
+  * Update rules, control file and change service unit file
+
+ -- Yunusemre Şentürk <yunusemre.senturk@pardus.org.tr>  Thu, 22 Nov 2018 12:08:18 +0300
+
+ahenk (1.1.6) unstable; urgency=medium
+
+  * Update install list
+
+ -- Yunusemre Şentürk <yunusemre.senturk@pardus.org.tr>  Thu, 22 Nov 2018 11:48:48 +0300
+
+ahenk (1.1.5) unstable; urgency=medium
+
+  * Update source according to eta project
+
+ -- Yunusemre Şentürk <yunusemre.senturk@pardus.org.tr>  Thu, 22 Nov 2018 11:38:31 +0300
+
+ahenk (1.1.4) unstable; urgency=medium
+
+  * Add lograte for ahenk.log
+  * Pardus CI integration
+
+ -- Yunusemre Şentürk <yunusemre.senturk@pardus.org.tr>  Wed, 21 Nov 2018 16:26:08 +0300
+
+ahenk (1.1.3) unstable; urgency=medium
+
+  * Update control file
+
+ -- Yunusemre Şentürk <yunusemre.senturk@pardus.org.tr>  Wed, 21 Nov 2018 12:10:05 +0300
+
+ahenk (1.1.2) unstable; urgency=medium
+
+  * update ahenk.install
+
+ -- Yunusemre Şentürk <yunusemre.senturk@pardus.org.tr>  Wed, 21 Nov 2018 11:57:35 +0300
+
+ahenk (1.1.1) unstable; urgency=medium
+
+  * Add dh-systemd to build depends
+  * Update rules file
+
+ -- Yunusemre Şentürk <yunusemre.senturk@pardus.org.tr>  Wed, 21 Nov 2018 11:48:54 +0300
+
+ahenk (1.1.0) unstable; urgency=medium
+
+  * Initial release.
+
+ -- Yunusemre Şentürk <yunusemre.senturk@pardus.org.tr>  Wed, 21 Nov 2018 11:40:45 +0300
