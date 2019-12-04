@@ -103,6 +103,23 @@ class Registration:
 
     def get_registration_params(self):
 
+        ## phase info for eta
+        processor = System.Hardware.Cpu.brand()
+        # processor for Vestel
+        if processor == "Intel i3 2330M - 2.20GHz - 3MB":
+            phase = "Faz 1"
+        elif processor == "Intel i3 3120M - 2.50GHz - 3MB":
+            phase = "Faz 2"
+        elif processor == "AMD A10-5750M - 2.5GHz - 4MB":
+            phase = "Faz 2"
+        elif processor == "Intel i3 4000M - 2.40GHz - 3MB":
+            phase = "Faz 2"
+        # processor for Arcelik
+        elif processor == "Intel(R) Core(TM) i3-8100T CPU @ 3.10GHz":
+            phase = "Faz 3"
+        else:
+            phase = 0
+
         parts = []
         for part in System.Hardware.Disk.partitions():
             parts.append(part[0])
@@ -147,6 +164,7 @@ class Registration:
             System.Hardware.BaseBoard.product_name()[0] == 0 else 'n/a',
             'hardware.baseboard.serialNumber': System.Hardware.BaseBoard.serial_number()[1].replace('\n', '') if
             System.Hardware.BaseBoard.serial_number()[0] == 0 else 'n/a',
+            'phase': phase,
         }
 
         return json.dumps(params)
