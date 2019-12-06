@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Author: Tuncay ÇOLAK <tuncay.colak@tubitak.gov.tr>
 
@@ -18,20 +18,23 @@ class ResourceUsage(AbstractPlugin):
             # phase info for eta
             processor = self.Hardware.Cpu.brand()
             # processor for Vestel
-            if processor == "Intel i3 2330M - 2.20GHz - 3MB":
-                phase = "Faz 1"
-            elif processor == "Intel i3 3120M - 2.50GHz - 3MB":
-                phase = "Faz 2"
-            elif processor == "AMD A10-5750M - 2.5GHz - 4MB":
-                phase = "Faz 2"
-            elif processor == "Intel i3 4000M - 2.40GHz - 3MB":
-                phase = "Faz 2"
+            if processor == "Intel i3 2330M - 2.20GHz - 3MB" or processor == "Intel(R) Core(TM) i3-2330M CPU @ 2.20GHz":
+                phase = "Faz 1 VESTEL"
+
+            elif processor == "Intel i3 3120M - 2.50GHz - 3MB" or processor == "Intel(R) Core(TM) i3-3120M CPU @ 2.50GHz":
+                phase = "Faz 2 Kısım 1 INTEL VESTEL"
+
+            elif processor == "AMD A10-5750M - 2.5GHz - 4MB" or processor == "AMD A10-5750M APU with Radeon(tm) HD Graphics":
+                phase = "Faz 2 Kısım 1 AMD VESTEL"
+
+            elif processor == "Intel i3 4000M - 2.40GHz - 3MB" or processor == "Intel(R) Core(TM) i3-4000M CPU @ 2.40GHz":
+                phase = "Faz 2 Kısım 2 VESTEL"
             # processor for Arcelik
-            elif processor == "Intel(R) Core(TM) i3-8100T CPU @ 3.10GHz":
-                phase = "Faz 3"
+
+            elif processor == "Intel(R) Core(TM) i3-8100T CPU @ 3.10GHz" or processor == "Intel i3-8th Gen (8100T 3.10 GHz)":
+                phase = "Faz 3 ARÇELİK"
             else:
                 phase = 0
-
 
             device = ""
             self.logger.debug("Gathering resource usage for disk, memory and CPU.")
