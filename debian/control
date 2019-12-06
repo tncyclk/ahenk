@@ -14,7 +14,7 @@ Depends: ${misc:Depends},
          ${python3:Depends},
          python3-cpuinfo,
          python3-netifaces,
-         python3-paramiko, 
+         python3-paramiko,
          python3-psutil,
          python3-sleekxmpp,
          python3-watchdog,
@@ -22,8 +22,9 @@ Depends: ${misc:Depends},
          libpam-script,
          chkconfig,
          acct,
-         eta-notify
+         eta-notify,
+         liderahenk-notify
 Description: The client side of the Lider Ahenk Project
  Lider Ahenk is an open source project which provides solutions
- to manage, monitor and audit unlimited number of different 
+ to manage, monitor and audit unlimited number of different
  systems and users on a network.
