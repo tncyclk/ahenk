@@ -1,98 +1,127 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
-# Author: Tuncay ÇOLAK <tuncay.colak@tubitak.gov.tr>
+# Author: Tucnay ÇOLAK <tuncay.colak@tubitak.gov.tr>
+
+## user-based application restriction for etap
 
 from base.plugin.abstract_plugin import AbstractPlugin
-from base.model.enum.content_type import ContentType
 
-class DesktopSettings(AbstractPlugin):
-
+class AppRestriction(AbstractPlugin):
     def __init__(self, task, context):
-        super(DesktopSettings, self).__init__()
-        self.message_code = self.get_message_code()
-        self.context = context
+        super(AbstractPlugin, self).__init__()
         self.task = task
+        self.context = context
         self.logger = self.get_logger()
-
-        if self.has_attr_json(task, 'hibernate') is True:
-            self.hibernate = self.task['hibernate']
-
-        if self.has_attr_json(task, 'app_right_click') is True:
-            self.app_right_click = self.task['app_right_click']
-
-        if self.has_attr_json(task, 'desktop_settings') is True:
-            self.desktop_settings = self.task['desktop_settings']
-
-        if self.has_attr_json(task, 'panel_preferences') is True:
-            self.panel_preferences = self.task['panel_preferences']
-
+        self.message_code = self.get_message_code()
+        self.applications = []
+        self.exist_app_list = []
 
     def handle_task(self):
-        # TODO Do what do you want to do!
-        # TODO Don't Forget returning response with <self.context.create_response(..)>
-
         try:
-            if self.has_attr_json(self.task, 'hibernate') is True:
-                self.settings_hibernate(self.hibernate)
+            self.applications = self.task['applicationList']
+            self.exist_app_list = self.task['isExistAppList']
 
-            if self.has_attr_json(self.task, 'app_right_click') is True:
-                pass
+            if len(self.exist_app_list) > 0:
+                self.remove_restriction_to_app()
 
-            if self.has_attr_json(self.task, 'desktop_settings') is True:
-                pass
-
-            if self.has_attr_json(self.task, 'panel_preferences') is True:
-                pass
+            if len(self.applications) > 0:
+                self.add_restiction_to_app()
 
             self.context.create_response(code=self.message_code.TASK_PROCESSED.value,
-                                     message='Sistem Kısıtlamaları görevi başarıyla gerçekleştirildi',
-                                     content_type=ContentType.APPLICATION_JSON.value)
+                                         message='Sınırlı erişim modu görevi başarıyla çalıştırıldı',
+                                         content_type=self.get_content_type().APPLICATION_JSON.value)
         except Exception as e:
-            self.context.create_response(code=self.message_code.TASK_PROCESSED.TASK_ERROR.value,
-                                         message='Sistem Kısıtlamaları görevi çalıştırılırken hata oluştu '+str(e),
-                                         content_type=ContentType.APPLICATION_JSON.value)
+            self.logger.error(str(e))
+            self.context.create_response(code=self.message_code.TASK_ERROR.value,
+                                         message='sınırlı erişim modu görevi çalıştırılırken hata oluştu: {0}'.format(str(e)))
 
-    def settings_hibernate(self, hibernate_data):
+    def remove_restriction_to_app(self):
 
-        temp_hibernate = "[Re-enable hibernate by default for login1]\n" \
-                         "  Identity=unix-user:*\n" \
-                         "  Action=org.freedesktop.login1.hibernate\n" \
-                         "  ResultActive={0}\n" \
-                         "[Re-enable hibernate for multiple users by default in logind]\n" \
-                         "  Identity=unix-user:*\n" \
-                         "  Action=org.freedesktop.login1.hibernate-multiple-sessions\n" \
-                         "  ResultActive={0}"
+        for exist_app_name in self.exist_app_list:
+            self.logger.info("Revert permission "+str(exist_app_name))
+            exe_app = self.get_executable_path(exist_app_name)
+            self.logger.debug("Find executable path {0} 's ".format(exist_app_name) + str(exe_app))
+            result_code, p_out, p_err = self.execute("ls -l {0}".format(exe_app))
+            p_out = p_out.strip("\n").split(" ")[-1]
 
-        self.logger.info("--->>>> get data: "+str(hibernate_data))
-        # close hibernate if data is active
-        if hibernate_data == "active":
-            a = "yes"
-        # open hibernate if data is active
-        elif hibernate_data == "passive":
-            a = "no"
+            if exe_app is not None:
+                if p_out == exe_app:
+                    self.set_default_mode_to_app(exe_app)
+                else:
+                    if "../" in p_out:
+                        p_out = p_out.replace("../", "/usr/")
+                        self.set_default_mode_to_app(p_out)
 
-        hibernate_settings_path = "/etc/polkit-1/localauthority/50-local.d/lider.ahenk.enable-hibernate.pkla"
-        if not self.is_exist(hibernate_settings_path):
-            self.logger.info("lider-ahenk.enable-hibernate.pkla does not exist.")
-            self.create_file(hibernate_settings_path)
-            self.write_file(hibernate_settings_path, temp_hibernate.format(a))
-            self.logger.info("Create file and write hibernate data to {0} file ".format(hibernate_settings_path))
-            self.logger.info("Enabled hibernate successfully")
-
-        else:
-            self.logger.info("{} file already exists".format(hibernate_settings_path))
-            line = self.read_file(hibernate_settings_path)
-            if "ResultActive=no" in line:
-                file_data = line.replace("ResultActive=no", "ResultActive=yes")
-                self.write_file(hibernate_settings_path, file_data)
-                self.logger.info("Enabled hibernate successfully")
+                    elif not "../" and "/" in p_out:
+                        if "/sbin/" in p_out:
+                            p_out = "/usr/sbin/" + str(p_out)
+                            self.set_default_mode_to_app(p_out)
+                        if "/bin/" in p_out:
+                            p_out = "/usr/bin/" + str(p_out)
+                            self.set_default_mode_to_app(p_out)
+                    else:
+                        self.set_default_mode_to_app(p_out)
             else:
-                file_data = line.replace("ResultActive=yes", "ResultActive=no")
-                self.write_file(hibernate_settings_path, file_data)
-                self.logger.info("Disabled hibernate successfully")
+                self.logger.debug("Not found executable path {0}".format(exist_app_name))
 
+        self.db_service.delete('app_restriction', None)
+
+    def add_restiction_to_app(self):
+        for app in self.applications:
+            app_name = app['app_name']
+            username = app['username']
+            restriction = app['restriction']
+
+            exe_app_path = self.get_executable_path(app_name)
+            self.logger.debug("Find executable path {0} 's ".format(app_name) + str(exe_app_path))
+
+            if exe_app_path is not None:
+                result_code, p_out, p_err = self.execute("ls -l {0}".format(exe_app_path))
+                p_out = p_out.strip("\n").split(" ")[-1]
+
+                if p_out == exe_app_path:
+                    self.change_mode_to_app(app, exe_app_path)
+                else:
+                    if "../" in p_out:
+                        p_out = p_out.replace("../", "/usr/")
+                        self.change_mode_to_app(app, p_out)
+
+                    elif not "../" and "/" in p_out:
+                        if "/sbin/" in p_out:
+                            p_out = "/usr/sbin/" + str(p_out)
+                            self.change_mode_to_app(app, p_out)
+                        if "/bin/" in p_out:
+                            p_out = "/usr/bin/" + str(p_out)
+                            self.change_mode_to_app(app, p_out)
+                    else:
+                        self.change_mode_to_app(app, p_out)
+            else:
+                self.logger.debug("Not found executable path {0}".format(app_name))
+
+    # permissions of applications changed for restricted
+    def change_mode_to_app(self, app, exe_app_path):
+
+        self.change_owner(exe_app_path, "root", "floppy")
+        self.logger.info("Changed owner {0}".format(exe_app_path))
+        self.execute("chmod 754 {0}".format(exe_app_path))
+        self.logger.info("Changed chmod {0}".format(exe_app_path))
+        self.save_application(app)
+
+    # revert permissions of applications changed
+    def set_default_mode_to_app(self, exe_app):
+        self.change_owner(exe_app, "root", "root")
+        self.logger.info("Revert owner {0}".format(exe_app))
+        self.execute("chmod 755 {0}".format(exe_app))
+        self.logger.info("Revert chmod {0}".format(exe_app))
+
+    def save_application(self, app):
+        cols = ['application_name', 'username', 'restriction']
+        values = [app["app_name"], app["username"], app["restriction"]]
+
+        self.logger.debug("Delete from app_restriction table")
+        self.db_service.update('app_restriction', cols, values)
+        self.logger.debug("Saved applications to ahenk.db")
 
 def handle_task(task, context):
-    print('Sample Plugin Task')
-    app = DesktopSettings(task, context)
-    app.handle_task()
+    plugin = AppRestriction(task, context)
+    plugin.handle_task()

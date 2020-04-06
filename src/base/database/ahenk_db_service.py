@@ -56,6 +56,7 @@ class AhenkDbService(object):
 
         self.check_and_create_table('service', ['id INTEGER PRIMARY KEY AUTOINCREMENT', 'serviceName TEXT', 'serviceStatus TEXT','timestamp TEXT','task_id INTEGER'])
         self.check_and_create_table('notify', ['id INTEGER PRIMARY KEY AUTOINCREMENT', 'send_time TEXT', 'content TEXT','duration TEXT','status INTEGER'])
+        self.check_and_create_table('app_restriction', ['id INTEGER PRIMARY KEY AUTOINCREMENT', 'application_name TEXT', 'username TEXT', 'restriction INTEGER'])
 
 
     def get_cols(self, table_name):

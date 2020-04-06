@@ -2,126 +2,80 @@
 # -*- coding: utf-8 -*-
 # Author: Tucnay ÇOLAK <tuncay.colak@tubitak.gov.tr>
 
-## user-based application restriction for etap 
-
+import json
 from base.plugin.abstract_plugin import AbstractPlugin
 
-class AppRestriction(AbstractPlugin):
-    def __init__(self, task, context):
+
+class InstalledApplications(AbstractPlugin):
+    def __init__(self, data, context):
         super(AbstractPlugin, self).__init__()
-        self.task = task
+        self.data = data
         self.context = context
         self.logger = self.get_logger()
         self.message_code = self.get_message_code()
-        self.applications = []
-        self.exist_app_list = []
+        self.temp_file_name = str(self.generate_uuid())
+        self.file_path = '{0}{1}'.format(str(self.Ahenk.received_dir_path()), self.temp_file_name)
 
     def handle_task(self):
         try:
-            self.applications = self.task['applicationList']
-            self.exist_app_list = self.task['isExistAppList']
+            self.logger.debug('Executing command for package list.')
+            self.execute(
+                'dpkg-query -f=\'${{Status}},${{binary:Package}}\n\' -W \'*\' | grep \'install ok installed\' | sed \'s/install ok installed/i/\' | sed \'s/unknown ok not-installed/u/\' | sed \'s/deinstall ok config-files/u/\' | grep -v ahenk > {0}'.format(
+                    self.file_path))
+            self.logger.debug('Command executed.')
+            apps = self.db_service.select('app_restriction', '*')
+            self.logger.info("Get application from ahenk.db "+str(apps))
+            for app in apps:
+                self.logger.debug(str(app[1]))
+                is_exist = self.is_exist_in_file(app[1])
+                if is_exist is True:
+                    self.replace_app_in_file(app)
 
-            if len(self.exist_app_list) > 0:
-                self.remove_restriction_to_app()
+            if self.is_exist(self.file_path):
+                data = {}
+                md5sum = self.get_md5_file(str(self.file_path))
+                self.logger.debug('{0} renaming to {1}'.format(self.temp_file_name, md5sum))
+                self.rename_file(self.file_path, self.Ahenk.received_dir_path() + '/' + md5sum)
+                self.logger.debug('Renamed.')
+                data['md5'] = md5sum
+                json_data = json.dumps(data)
 
-            if len(self.applications) > 0:
-                self.add_restiction_to_app()
+                self.context.create_response(code=self.message_code.TASK_PROCESSED.value,
+                                             message='Uygulama listesi başarıyla okundu.',
+                                             data=json_data,
+                                             content_type=self.get_content_type().TEXT_PLAIN.value)
 
-            self.context.create_response(code=self.message_code.TASK_PROCESSED.value,
-                                         message='Uygulama başarıyla kısıtlandı',
-                                         content_type=self.get_content_type().APPLICATION_JSON.value)
+                self.logger.debug('Application list created successfully')
+            else:
+                raise Exception('File not found on this path: {}'.format(self.file_path))
+
         except Exception as e:
             self.logger.error(str(e))
             self.context.create_response(code=self.message_code.TASK_ERROR.value,
-                                         message='Uygulama kısıtlanırken hata oluştu: {0}'.format(str(e)))
+                                         message='Uygulama listesi oluşturulurken hata oluştu: ' + str(e),
+                                         content_type=self.get_content_type().APPLICATION_JSON.value)
 
-    def remove_restriction_to_app(self):
 
-        for exist_app_name in self.exist_app_list:
-            self.logger.info("Revert permission "+str(exist_app_name))
-            exe_app = self.get_executable_path(exist_app_name)
-            self.logger.debug("Find executable path {0} 's ".format(exist_app_name) + str(exe_app))
-            result_code, p_out, p_err = self.execute("ls -l {0}".format(exe_app))
-            p_out = p_out.strip("\n").split(" ")[-1]
-
-            if exe_app is not None:
-                if p_out == exe_app:
-                    self.set_default_mode_to_app(exe_app)
-                else:
-                    if "../" in p_out:
-                        p_out = p_out.replace("../", "/usr/")
-                        self.set_default_mode_to_app(p_out)
-
-                    elif not "../" and "/" in p_out:
-                        if "/sbin/" in p_out:
-                            p_out = "/usr/sbin/" + str(p_out)
-                            self.set_default_mode_to_app(p_out)
-                        if "/bin/" in p_out:
-                            p_out = "/usr/bin/" + str(p_out)
-                            self.set_default_mode_to_app(p_out)
-                    else:
-                        self.set_default_mode_to_app(p_out)
+    def is_exist_in_file(self, app_name):
+        with open(self.file_path) as f:
+            if app_name in f.read():
+                return True
             else:
-                self.logger.debug("Not found executable path {0}".format(exist_app_name))
+                return False
 
-        self.db_service.delete('app_restriction', None)
+    def replace_app_in_file(self, app):
+        old_line = 'i,{0}'.format(app[1])
+        new_line = 'i,{0},{1},{2}'.format(app[1], app[2], app[3])
+        file_app = open(self.file_path, 'r')
+        file_data = file_app.read()
+        file_data = file_data.replace(old_line, new_line)
+        file_app.close()
 
-    def add_restiction_to_app(self):
-        for app in self.applications:
-            app_name = app['app_name']
-            username = app['username']
-            restriction = app['restriction']
-
-            exe_app_path = self.get_executable_path(app_name)
-            self.logger.debug("Find executable path {0} 's ".format(app_name) + str(exe_app_path))
-
-            if exe_app_path is not None:
-                result_code, p_out, p_err = self.execute("ls -l {0}".format(exe_app_path))
-                p_out = p_out.strip("\n").split(" ")[-1]
-
-                if p_out == exe_app_path:
-                    self.change_mode_to_app(app, exe_app_path)
-                else:
-                    if "../" in p_out:
-                        p_out = p_out.replace("../", "/usr/")
-                        self.change_mode_to_app(app, p_out)
-
-                    elif not "../" and "/" in p_out:
-                        if "/sbin/" in p_out:
-                            p_out = "/usr/sbin/" + str(p_out)
-                            self.change_mode_to_app(app, p_out)
-                        if "/bin/" in p_out:
-                            p_out = "/usr/bin/" + str(p_out)
-                            self.change_mode_to_app(app, p_out)
-                    else:
-                        self.change_mode_to_app(app, p_out)
-            else:
-                self.logger.debug("Not found executable path {0}".format(app_name))
-
-    # permissions of applications changed for restricted
-    def change_mode_to_app(self, app, exe_app_path):
-
-        self.change_owner(exe_app_path, "root", "floppy")
-        self.logger.info("Changed owner {0}".format(exe_app_path))
-        self.execute("chmod 754 {0}".format(exe_app_path))
-        self.logger.info("Changed chmod {0}".format(exe_app_path))
-        self.save_application(app)
-
-    # revert permissions of applications changed
-    def set_default_mode_to_app(self, exe_app):
-        self.change_owner(exe_app, "root", "root")
-        self.logger.info("Revert owner {0}".format(exe_app))
-        self.execute("chmod 755 {0}".format(exe_app))
-        self.logger.info("Revert chmod {0}".format(exe_app))
-
-    def save_application(self, app):
-        cols = ['application_name', 'username', 'restriction']
-        values = [app["app_name"], app["username"], app["restriction"]]
-
-        self.logger.debug("Delete from app_restriction table")
-        self.db_service.update('app_restriction', cols, values)
-        self.logger.debug("Saved applications to ahenk.db")
+        file_app = open(self.file_path, 'w')
+        file_app.write(file_data)
+        file_app.close()
+        self.logger.info("Replaced successfully restriction application in installed application")
 
 def handle_task(task, context):
-    plugin = AppRestriction(task, context)
+    plugin = InstalledApplications(task, context)
     plugin.handle_task()

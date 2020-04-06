@@ -145,6 +145,16 @@ class Util:
             raise
 
     @staticmethod
+    def get_executable_path(app_name):
+        path = None
+        try:
+            path = shutil.which(app_name)
+        except:
+            raise
+        finally:
+            return path
+
+    @staticmethod
     def execute(command, stdin=None, env=None, cwd=None, shell=True, result=True, as_user=None, ip=None):
 
         try:
