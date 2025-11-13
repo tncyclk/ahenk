@@ -14,7 +14,8 @@ import os
 
 from helper import system as sysx
 
-from sleekxmpp import ClientXMPP
+from slixmpp import ClientXMPP
+from slixmpp.exceptions import IqError, IqTimeout
 from base.scope import Scope
 
 sys.path.append('../..')
@@ -33,13 +34,12 @@ class AnonymousMessenger(ClientXMPP):
         if host is not None and servicename is not None:
             self.host = str(host)
             self.service = str(servicename)
-            self.port = str(self.configuration_manager.get('CONNECTION', 'port'))
+        else:
+            self.host = str(socket.gethostbyname(self.configuration_manager.get('CONNECTION', 'host')))
+            self.service = str(self.configuration_manager.get('CONNECTION', 'servicename'))
+        self.port = int(self.configuration_manager.get('CONNECTION', 'port'))
 
-        # self.host = str(socket.gethostbyname(self.configuration_manager.get('CONNECTION', 'host')))
-        # self.service = str(self.configuration_manager.get('CONNECTION', 'servicename'))
-        # self.port = str(self.configuration_manager.get('CONNECTION', 'port'))
-
-        ClientXMPP.__init__(self, self.service, None)
+        super().__init__(self.service, None)
 
         self.message = message
         self.receiver_resource = self.configuration_manager.get('CONNECTION', 'receiverresource')
@@ -62,10 +62,13 @@ class AnonymousMessenger(ClientXMPP):
         self.add_event_handler("message", self.recv_direct_message)
         self.logger.debug('Event handlers were added')
 
-    def session_start(self, event):
+    async def session_start(self, event):
         self.logger.debug('Session was started')
-        self.get_roster()
         self.send_presence()
+        try:
+            await self.get_roster()
+        except (IqError, IqTimeout) as e:
+            self.logger.error('Roster retrieval failed. Error Message: {0}'.format(str(e)))
 
         if self.message is not None:
             self.send_direct_message(self.message)
@@ -85,8 +88,17 @@ class AnonymousMessenger(ClientXMPP):
         try:
             self.logger.debug('Connecting to server...')
             self['feature_mechanisms'].unencrypted_plain = True
-            self.connect((self.host, self.port), use_tls=self.use_tls)
-            self.process(block=True)
+            connect_kwargs = {'address': (self.host, self.port)}
+
+            if not self.use_tls:
+                connect_kwargs['disable_starttls'] = True
+
+            connected = self.connect(**connect_kwargs)
+            if not connected:
+                self.logger.error('Connection to server is failed! Unable to establish TCP connection.')
+                return False
+
+            self.process(forever=True)
             self.logger.debug('Connection were established successfully')
             return True
         except Exception as e:
