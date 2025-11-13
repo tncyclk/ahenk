@@ -5,7 +5,9 @@
 import json
 import sys
 import socket
-from sleekxmpp import ClientXMPP
+import threading
+from slixmpp import ClientXMPP
+from slixmpp.exceptions import IqError, IqTimeout
 
 from base.scope import Scope
 
@@ -26,7 +28,7 @@ class Messenger(ClientXMPP):
                                                                                                        'servicename'))
         self.my_pass = str(self.configuration_manager.get('CONNECTION', 'password'))
 
-        ClientXMPP.__init__(self, self.my_jid, self.my_pass)
+        super().__init__(self.my_jid, self.my_pass)
 
         self.auto_authorize = True
         self.auto_subscribe = True
@@ -46,12 +48,13 @@ class Messenger(ClientXMPP):
         if self.receiver_resource:
             self.receiver += '/' + self.receiver_resource
 
-        self.port = self.configuration_manager.get('CONNECTION', 'port')
+        self.port = int(self.configuration_manager.get('CONNECTION', 'port'))
         self.logger.debug('XMPP Messager parameters were set')
 
         self.register_extensions()
         self.add_listeners()
         self.roster.auto_subscribe = True
+        self._process_thread = None
 
     def register_extensions(self):
         try:
@@ -74,8 +77,19 @@ class Messenger(ClientXMPP):
     def connect_to_server(self):  # Connect to the XMPP server and start processing XMPP stanzas.
         try:
             self['feature_mechanisms'].unencrypted_plain = True
-            self.connect((self.hostname, self.port), use_tls=self.use_tls)
-            self.process(block=False)
+            connect_kwargs = {'address': (self.hostname, self.port)}
+
+            if not self.use_tls:
+                connect_kwargs['disable_starttls'] = True
+
+            connected = self.connect(**connect_kwargs)
+            if not connected:
+                self.logger.error('Connection to server is failed! Unable to establish TCP connection.')
+                return False
+
+            self._process_thread = threading.Thread(target=self.process, kwargs={'forever': True}, daemon=True)
+            self._process_thread.start()
+
             self.logger.debug('Connection were established successfully')
             return True
         except Exception as e:
@@ -85,10 +99,13 @@ class Messenger(ClientXMPP):
     def session_end(self):
         self.logger.warning('DISCONNECTED')
 
-    def session_start(self, event):
+    async def session_start(self, event):
         self.logger.debug('Session was started')
-        self.get_roster()
         self.send_presence()
+        try:
+            await self.get_roster()
+        except (IqError, IqTimeout) as e:
+            self.logger.error('Roster retrieval failed. Error Message: {0}'.format(str(e)))
 
     def send_direct_message(self, msg):
         try:
